@@ -47,7 +47,7 @@ def procesar_y_graficar_canal(axes_row, canal, cmap_orig, nombre_canal, transfor
     axes_row[0].set_title(f"Orig. {nombre_canal}", fontsize=11)
     axes_row[0].axis('off')
     
-    # Col 1: Transformación (visualizado en gris para análisis de intensidad)
+    # Col 1: Transformación
     axes_row[1].imshow(canal_trans, cmap='gray') 
     axes_row[1].set_title(f"{nombre_trans}", fontsize=11)
     axes_row[1].axis('off')
@@ -60,7 +60,7 @@ def procesar_y_graficar_canal(axes_row, canal, cmap_orig, nombre_canal, transfor
     axes_row[3].set_title("Seg. Binaria (127)", fontsize=11)
     axes_row[3].axis('off')
     
-    # Col 4: Histograma Binaria (Típicamente dos líneas verticales en 0 y 255)
+    # Col 4: Histograma Binaria
     graficar_histograma(axes_row[4], [binaria], ['black'], ['Bin'], "Hist. Binaria")
     
     # Col 5: Segmentación Otsu
@@ -74,21 +74,15 @@ def procesar_y_graficar_canal(axes_row, canal, cmap_orig, nombre_canal, transfor
 # --- Lógica Principal de Visualización ---
 
 def visualizar_analisis(grupo, modo):
-    # Diccionario para mapear el número de grupo al prefijo base del archivo
     bases = {'1': 'd1', '2': 'd1_lat', '3': 'd2', '4': 'd2_lat'}
     base = bases[grupo]
     carpeta = "Fotos_PDI_2026_Grupo1"
     
     # ==========================================
-    # CASO EXCEPCIÓN: RGB (Sin segmentación)
+    # CASO: RGB (3 Condiciones, sin segmentar)
     # ==========================================
     if modo == 'RGB':
-        # Se muestran las 3 condiciones originales para el grupo seleccionado
-        rutas = [
-            f"{carpeta}/{base}_seco.jpg",
-            f"{carpeta}/{base}_agua.jpg",
-            f"{carpeta}/{base}_crema.jpg"
-        ]
+        rutas = [f"{carpeta}/{base}_seco.jpg", f"{carpeta}/{base}_agua.jpg", f"{carpeta}/{base}_crema.jpg"]
         condiciones = ['Seco', 'Agua (Mojado)', 'Crema']
         
         fig, axes = plt.subplots(nrows=3, ncols=5, figsize=(20, 10))
@@ -123,26 +117,44 @@ def visualizar_analisis(grupo, modo):
 
         plt.tight_layout()
         plt.show()
-        
+
     # ==========================================
-    # CASOS CON TRANSFORMACIÓN Y SEGMENTACIÓN
+    # CASO: Escala de Grises (3 Condiciones + Estiramiento)
+    # ==========================================
+    elif modo == 'G':
+        rutas = [f"{carpeta}/{base}_seco.jpg", f"{carpeta}/{base}_agua.jpg", f"{carpeta}/{base}_crema.jpg"]
+        condiciones = ['Seco', 'Agua', 'Crema']
+        
+        fig, axes = plt.subplots(nrows=3, ncols=7, figsize=(26, 12))
+        fig.suptitle(f'Grupo {grupo} | Espacio: Grises | Transformación: Estiramiento', fontsize=16)
+        
+        for i, (ruta, condicion) in enumerate(zip(rutas, condiciones)):
+            img_bgr = cv2.imread(ruta)
+            if img_bgr is None:
+                print(f"Advertencia: No se pudo cargar '{ruta}'.")
+                continue
+                
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+            
+            # Se procesa cada condición (fila i) en escala de grises con Estiramiento
+            procesar_y_graficar_canal(axes[i], img_gray, 'gray', f'Gris ({condicion})', aplicar_estiramiento, "Estirado", 'black')
+            
+        plt.tight_layout()
+        plt.show()
+
+    # ==========================================
+    # CASO: HSV y CIELAB (1 Condición, 3 Canales)
     # ==========================================
     else:
-        # Configurar la ruta y la transformación según la palabra clave ingresada
         if modo == 'HSV':
             condicion = 'seco'
             transformacion_func = aplicar_estiramiento
             nombre_trans = "Estirado"
-            
         elif modo == 'CIELAB':
             condicion = 'crema'
             transformacion_func = aplicar_ecualizacion
             nombre_trans = "Ecualizado"
-            
-        elif modo == 'G':
-            condicion = 'agua'
-            transformacion_func = aplicar_estiramiento
-            nombre_trans = "Estirado"
             
         ruta = f"{carpeta}/{base}_{condicion}.jpg"
         img_bgr = cv2.imread(ruta)
@@ -153,35 +165,26 @@ def visualizar_analisis(grupo, modo):
             
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         
-        # Procesamiento para Escala de Grises (1 sola fila)
-        if modo == 'G':
-            fig, axes = plt.subplots(nrows=1, ncols=7, figsize=(24, 4))
-            fig.suptitle(f'Grupo {grupo} | Espacio: {modo} (Dedo {condicion}) | Transformación: {nombre_trans}', fontsize=16)
+        fig, axes = plt.subplots(nrows=3, ncols=7, figsize=(26, 12))
+        fig.suptitle(f'Grupo {grupo} | Espacio: {modo} (Dedo {condicion}) | Transformación: {nombre_trans}', fontsize=16)
+        
+        if modo == 'HSV':
+            img_espacio = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
+            cmaps = ['hsv', 'gray', 'gray']
+            nombres = ['H', 'S', 'V']
+            colores_hist = ['purple', 'cyan', 'black']
+        else: # CIELAB
+            img_espacio = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
+            cmaps = ['gray', 'gray', 'gray']
+            nombres = ['L', 'A', 'B']
+            colores_hist = ['black', 'green', 'blue']
             
-            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-            procesar_y_graficar_canal(axes, img_gray, 'gray', 'Gris', transformacion_func, nombre_trans, 'black')
+        canales = cv2.split(img_espacio)
+        
+        # Se procesa cada canal (H,S,V o L,A,B) de la única imagen cargada
+        for i, canal in enumerate(canales):
+            procesar_y_graficar_canal(axes[i], canal, cmaps[i], nombres[i], transformacion_func, nombre_trans, colores_hist[i])
             
-        # Procesamiento para HSV y CIELAB (3 filas, una por canal)
-        else:
-            fig, axes = plt.subplots(nrows=3, ncols=7, figsize=(26, 12))
-            fig.suptitle(f'Grupo {grupo} | Espacio: {modo} (Dedo {condicion}) | Transformación: {nombre_trans}', fontsize=16)
-            
-            if modo == 'HSV':
-                img_espacio = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
-                cmaps = ['hsv', 'gray', 'gray']
-                nombres = ['H', 'S', 'V']
-                colores_hist = ['purple', 'cyan', 'black']
-            else: # CIELAB
-                img_espacio = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
-                cmaps = ['gray', 'gray', 'gray']
-                nombres = ['L', 'A', 'B']
-                colores_hist = ['black', 'green', 'blue']
-                
-            canales = cv2.split(img_espacio)
-            
-            for i, canal in enumerate(canales):
-                procesar_y_graficar_canal(axes[i], canal, cmaps[i], nombres[i], transformacion_func, nombre_trans, colores_hist[i])
-                
         plt.tight_layout()
         plt.show()
 
@@ -193,10 +196,10 @@ modos_validos = ['G', 'RGB', 'HSV', 'CIELAB']
 while True:
     print("\n--- Visualizador Avanzado de Segmentación ---")
     print("Opciones de comando: [Grupo] [Modo]")
-    print("- G      : Dedo con agua (Estiramiento + Segmentaciones)")
-    print("- HSV    : Dedo seco (Estiramiento + Segmentaciones)")
-    print("- CIELAB : Dedo con crema (Ecualización + Segmentaciones)")
+    print("- G      : Seco, Agua y Crema (Estiramiento + Segmentaciones)")
     print("- RGB    : Originales de Seco, Agua y Crema (Sin segmentar)")
+    print("- HSV    : Dedo seco (Estiramiento + Segmentaciones por canal)")
+    print("- CIELAB : Dedo con crema (Ecualización + Segmentaciones por canal)")
     print("Ejemplos: '1 CIELAB', '3 HSV', '2 G', '4 RGB'")
     
     entrada = input("Ingresa tu comando (o 'q' para salir): ").strip().upper()
