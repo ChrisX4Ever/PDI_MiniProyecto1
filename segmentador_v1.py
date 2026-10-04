@@ -79,16 +79,17 @@ def visualizar_analisis(grupo, modo):
     carpeta = "Fotos_PDI_2026_Grupo1"
     
     # ==========================================
-    # CASO: RGB (3 Condiciones, sin segmentar)
+    # CASO: RGB (3 Condiciones, 3 Canales cada una -> 9 filas)
     # ==========================================
     if modo == 'RGB':
         rutas = [f"{carpeta}/{base}_seco.jpg", f"{carpeta}/{base}_agua.jpg", f"{carpeta}/{base}_crema.jpg"]
-        condiciones = ['Seco', 'Agua (Mojado)', 'Crema']
+        condiciones = ['Seco', 'Agua', 'Crema']
         
-        fig, axes = plt.subplots(nrows=3, ncols=5, figsize=(20, 10))
-        fig.suptitle(f'Análisis Grupo {grupo} - Espacio: RGB (Fotos Originales)', fontsize=16)
+        # 9 filas en total (3 condiciones * 3 canales)
+        fig, axes = plt.subplots(nrows=9, ncols=7, figsize=(26, 36))
+        fig.suptitle(f'Grupo {grupo} | Espacio: RGB | Transformación: Ecualización', fontsize=18)
         
-        for i, (ruta, condicion) in enumerate(zip(rutas, condiciones)):
+        for idx_cond, (ruta, condicion) in enumerate(zip(rutas, condiciones)):
             img_bgr = cv2.imread(ruta)
             if img_bgr is None:
                 print(f"Advertencia: No se pudo cargar '{ruta}'.")
@@ -97,25 +98,17 @@ def visualizar_analisis(grupo, modo):
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             r, g, b = cv2.split(img_rgb)
             
-            axes[i, 0].imshow(img_rgb)
-            axes[i, 0].set_title(f'Original: {condicion}')
-            axes[i, 0].axis('off')
+            canales = [r, g, b]
+            cmaps = ['Reds', 'Greens', 'Blues']
+            nombres = [f'R ({condicion})', f'G ({condicion})', f'B ({condicion})']
+            colores_hist = ['red', 'green', 'blue']
             
-            axes[i, 1].imshow(r, cmap='Reds')
-            axes[i, 1].set_title('Canal R')
-            axes[i, 1].axis('off')
-            
-            axes[i, 2].imshow(g, cmap='Greens')
-            axes[i, 2].set_title('Canal G')
-            axes[i, 2].axis('off')
-            
-            axes[i, 3].imshow(b, cmap='Blues')
-            axes[i, 3].set_title('Canal B')
-            axes[i, 3].axis('off')
+            for i, canal in enumerate(canales):
+                # Calcular la fila correcta en la cuadrícula de 9 filas
+                fila_actual = (idx_cond * 3) + i
+                procesar_y_graficar_canal(axes[fila_actual], canal, cmaps[i], nombres[i], aplicar_ecualizacion, "Ecualizado", colores_hist[i])
 
-            graficar_histograma(axes[i, 4], [r, g, b], ['red', 'green', 'blue'], ['R', 'G', 'B'], f'Hist. RGB ({condicion})')
-
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.98]) # Ajuste ligero para que el título general no se solape
         plt.show()
 
     # ==========================================
@@ -137,7 +130,6 @@ def visualizar_analisis(grupo, modo):
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
             
-            # Se procesa cada condición (fila i) en escala de grises con Estiramiento
             procesar_y_graficar_canal(axes[i], img_gray, 'gray', f'Gris ({condicion})', aplicar_estiramiento, "Estirado", 'black')
             
         plt.tight_layout()
@@ -181,7 +173,6 @@ def visualizar_analisis(grupo, modo):
             
         canales = cv2.split(img_espacio)
         
-        # Se procesa cada canal (H,S,V o L,A,B) de la única imagen cargada
         for i, canal in enumerate(canales):
             procesar_y_graficar_canal(axes[i], canal, cmaps[i], nombres[i], transformacion_func, nombre_trans, colores_hist[i])
             
@@ -197,9 +188,9 @@ while True:
     print("\n--- Visualizador Avanzado de Segmentación ---")
     print("Opciones de comando: [Grupo] [Modo]")
     print("- G      : Seco, Agua y Crema (Estiramiento + Segmentaciones)")
-    print("- RGB    : Originales de Seco, Agua y Crema (Sin segmentar)")
-    print("- HSV    : Dedo seco (Estiramiento + Segmentaciones por canal)")
-    print("- CIELAB : Dedo con crema (Ecualización + Segmentaciones por canal)")
+    print("- RGB    : Seco, Agua y Crema (Ecualización + Segmentaciones por canal R, G, B)")
+    print("- HSV    : Dedo seco (Estiramiento + Segmentaciones por canal H, S, V)")
+    print("- CIELAB : Dedo con crema (Ecualización + Segmentaciones por canal L, A, B)")
     print("Ejemplos: '1 CIELAB', '3 HSV', '2 G', '4 RGB'")
     
     entrada = input("Ingresa tu comando (o 'q' para salir): ").strip().upper()
